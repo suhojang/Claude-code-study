@@ -131,6 +131,18 @@ src/main/java/com/example/app/
 
 @.claude/rules/performance.md
 
+## 도메인 모듈별 상세 규칙
+
+각 모듈 디렉토리에 CLAUDE.md가 있으며, 해당 모듈 작업 시 자동으로 로드된다.
+
+- 주문: `src/main/java/com/example/app/order/CLAUDE.md`
+- 상품: `src/main/java/com/example/app/product/CLAUDE.md`
+- 회원: `src/main/java/com/example/app/member/CLAUDE.md`
+- 결제: `src/main/java/com/example/app/payment/CLAUDE.md`
+- 배송: `src/main/java/com/example/app/delivery/CLAUDE.md`
+- 알림: `src/main/java/com/example/app/notification/CLAUDE.md`
+- 공유: `src/main/java/com/example/app/_shared/CLAUDE.md`
+
 ## DB 마이그레이션
 
 - Flyway 경로: **모듈별 분리** `src/main/resources/db/migration/{module}/`
