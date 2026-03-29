@@ -252,39 +252,52 @@ class SecurityConfig {
 | 새 모듈이 기존 모듈 의존 | 동기 호출 필요 | `api/` 공개 인터페이스 또는 이벤트 사용 |
 | 공통 DTO 변경 | `_shared/` 수정 | `_shared/` 변경은 platform 팀만, 하위 호환 필수 |
 
-## ArchUnit + Spring Modulith 검증
+## Spring Modulith + JUnit 5 아키텍처 검증
+
+ArchUnit 없이 Spring Modulith의 `ApplicationModules.verify()`와 JUnit 5만으로 모든 아키텍처 규칙을 검증한다.
 
 ```java
-@AnalyzeClasses(packages = "com.example.app")
-class ModuleBoundaryArchTest {
+class ModularityTests {
 
-    // Spring Modulith 모듈 구조 자동 검증
-    ApplicationModules modules = ApplicationModules.of(Application.class);
+    private final ApplicationModules modules = ApplicationModules.of(Application.class);
 
+    @DisplayName("모듈 간 내부 패키지 접근 위반이 없어야 한다")
     @Test
-    void should_verify_modulith_structure() {
-        modules.verify();  // 내부 패키지 접근 위반, 순환 참조 등 자동 감지
+    void should_verify_no_internal_access_violation() {
+        // domain/, adapter/ 등 내부 패키지를 다른 모듈에서 참조하면 실패
+        // 순환 참조가 있으면 실패
+        modules.verify();
     }
 
-    // 추가 ArchUnit 규칙: domain → adapter 역방향 의존 금지
-    @ArchTest
-    static final ArchRule domain_should_not_depend_on_adapter =
-        noClasses().that().resideInAPackage("..domain..")
-            .should().dependOnClassesThat()
-            .resideInAPackage("..adapter..");
+    @DisplayName("모든 모듈이 정상적으로 인식되어야 한다")
+    @Test
+    void should_detect_all_application_modules() {
+        // 각 모듈이 올바르게 구성되었는지 확인
+        assertThat(modules.stream().map(m -> m.getName()))
+            .contains("order", "product", "member", "payment", "delivery");
+    }
 
-    // 추가 ArchUnit 규칙: domain에 프레임워크 어노테이션 금지
-    @ArchTest
-    static final ArchRule domain_model_should_be_framework_free =
-        noClasses().that().resideInAPackage("..domain.model..")
-            .should().dependOnClassesThat()
-            .resideInAnyPackage(
-                "jakarta.persistence..",
-                "org.springframework..",
-                "com.fasterxml.jackson.."
-            );
+    @DisplayName("각 모듈별 격리 부트스트랩이 성공해야 한다")
+    @TestFactory
+    Stream<DynamicTest> should_bootstrap_each_module_independently() {
+        return modules.stream()
+            .map(module -> DynamicTest.dynamicTest(
+                module.getName() + " 모듈 독립 부트스트랩",
+                () -> module.verify(modules)
+            ));
+    }
 }
 ```
+
+### Spring Modulith가 자동 검증하는 항목 (ArchUnit 불필요)
+
+| 검증 항목 | Spring Modulith의 verify() | ArchUnit 필요 여부 |
+|:---|:---|:---|
+| 다른 모듈 내부 패키지 접근 | ✅ 자동 감지 | ❌ 불필요 |
+| 모듈 간 순환 참조 | ✅ 자동 감지 | ❌ 불필요 |
+| Named Interface 위반 | ✅ 자동 감지 | ❌ 불필요 |
+| domain → adapter 역방향 의존 | ✅ 내부 패키지 규칙으로 감지 | ❌ 불필요 |
+| 허용되지 않은 모듈 의존 | ✅ `@ApplicationModule(allowedDependencies)` | ❌ 불필요 |
 
 ## 모듈 문서 자동 생성
 

@@ -17,7 +17,7 @@ globs: src/test/**/*.java
 | 모듈 간 이벤트 | 이벤트 발행/수신 테스트 | `@ApplicationModuleTest` + `Scenario` | 모듈만 로드 |
 | 전체 통합 | 통합 테스트 | `@SpringBootTest` + Testcontainers | 전체 로드 |
 | 모듈 구조 검증 | Modulith 구조 테스트 | `ApplicationModules.of()` | ❌ |
-| 아키텍처 검증 | ArchUnit | `@AnalyzeClasses` | ❌ |
+| 아키텍처 검증 | Spring Modulith verify | `ApplicationModules.of()` | ❌ |
 
 ## Spring Modulith 모듈 구조 검증 테스트
 

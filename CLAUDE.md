@@ -14,7 +14,7 @@ Spring Boot 4.x 기반 모듈러 모놀리스 쇼핑몰 플랫폼.
 - **Database**: PostgreSQL 16 + Redis 7 (캐시/세션)
 - **Migration**: Flyway
 - **Mapper**: MapStruct 1.6+
-- **Test**: JUnit 5, Mockito, AssertJ, Testcontainers, ArchUnit, Spring Modulith Test
+- **Test**: JUnit 5, Mockito, AssertJ, Testcontainers, Spring Modulith Test
 
 ## 빌드 & 실행
 
@@ -51,8 +51,8 @@ Spring Boot 4.x 기반 모듈러 모놀리스 쇼핑몰 플랫폼.
 # 통합 테스트 (Testcontainers - Docker 필요)
 ./gradlew integrationTest
 
-# 아키텍처 테스트 (ArchUnit)
-./gradlew test --tests "*.architecture.*"
+# 모듈 구조 검증 테스트 (Spring Modulith)
+./gradlew test --tests "*.ModularityTests"
 ```
 
 ## 패키지 구조 (Spring Modulith 모듈 = 최상위 패키지)
