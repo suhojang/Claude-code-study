@@ -19,7 +19,7 @@ Domain은 어떤 Adapter도 알지 못한다.
 ### domain/model/
 - 순수 Java 클래스만 허용 (POJO)
 - Spring, JPA, Jackson, Lombok 등 프레임워크 어노테이션 전면 금지
-- Java 21 record를 Value Object에 적극 활용
+- Java 25 record를 Value Object에 적극 활용
 - Entity는 일반 class로 작성하되 불변성 최대한 보장
 - 모든 상태 변경은 의미 있는 도메인 메서드를 통해서만 수행
 - 생성은 반드시 정적 팩토리 메서드 사용 (`Order.create(...)`)

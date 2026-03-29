@@ -6,7 +6,7 @@ Spring Boot 4.x 기반 모놀리스 쇼핑몰 플랫폼.
 헥사고날 아키텍처(Ports & Adapters)를 적용하여 도메인 순수성을 보장하고,
 모듈 경계를 엄격히 관리하여 향후 마이크로서비스 전환이 가능하도록 설계한다.
 
-- **Language**: Java 21 (record, sealed class, pattern matching, virtual thread)
+- **Language**: Java 25 (record, sealed class, pattern matching, virtual thread, structured concurrency, scoped value, stable value, flexible constructor, module import, primitive pattern)
 - **Framework**: Spring Boot 4.x, Spring Security 7.x
 - **Build**: Gradle 8.x (Kotlin DSL)
 - **Database**: PostgreSQL 16 + Redis 7 (캐시/세션)

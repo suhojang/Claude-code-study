@@ -92,7 +92,7 @@ class ProductPersistenceAdapter implements LoadProductPort {
 - TTL 필수 설정 (무기한 캐시 금지)
 - 데이터 변경 시 관련 캐시 무효화 (`@CacheEvict` 또는 명시적 삭제)
 
-## Virtual Thread (Spring Boot 4.x)
+## Virtual Thread & Structured Concurrency (Java 25 + Spring Boot 4.x)
 
 ```yaml
 spring:
@@ -104,7 +104,7 @@ spring:
 ### Virtual Thread 규칙
 - I/O 바운드 작업(DB, HTTP, 파일)에서 자동 활용
 - `synchronized` 블록 사용 자제 → `ReentrantLock` 사용 (pinning 방지)
-- ThreadLocal 사용 시 ScopedValue 대체 검토
+- `ThreadLocal` 사용 금지 → `ScopedValue` (Java 25 정식) 사용
 
 ```java
 // ❌ synchronized → Virtual Thread pinning 발생
@@ -122,6 +122,52 @@ public void doSomething() {
     } finally {
         lock.unlock();
     }
+}
+```
+
+### ScopedValue (ThreadLocal 대체)
+```java
+// ❌ ThreadLocal: Virtual Thread에서 메모리 누수 위험
+private static final ThreadLocal<MemberId> currentMember = new ThreadLocal<>();
+
+// ✅ ScopedValue: Virtual Thread 안전, 불변, 범위 자동 해제
+private static final ScopedValue<MemberId> CURRENT_MEMBER = ScopedValue.newInstance();
+
+ScopedValue.runWhere(CURRENT_MEMBER, memberId, () -> {
+    orderService.execute(command);  // 하위 호출에서 CURRENT_MEMBER.get() 가능
+});
+```
+
+### Structured Concurrency (병렬 작업)
+```java
+// ✅ 외부 API 병렬 호출 — 하나라도 실패하면 나머지 자동 취소
+public OrderSummary buildOrderSummary(OrderId orderId) throws Exception {
+    try (var scope = StructuredTaskScope.open()) {
+        var orderTask = scope.fork(() -> loadOrderPort.findById(orderId));
+        var paymentTask = scope.fork(() -> loadPaymentPort.findByOrderId(orderId));
+        var deliveryTask = scope.fork(() -> trackDeliveryPort.track(orderId));
+
+        scope.join();
+
+        return new OrderSummary(
+            orderTask.get(),
+            paymentTask.get(),
+            deliveryTask.get()
+        );
+    }
+}
+```
+
+### StableValue (지연 초기화)
+```java
+// ❌ volatile + double-checked locking: 복잡하고 실수 가능
+private volatile ExpensiveResource resource;
+
+// ✅ StableValue: 스레드 안전한 지연 초기화 (Java 25)
+private final StableValue<ExpensiveResource> resource = StableValue.of();
+
+public ExpensiveResource getResource() {
+    return resource.orElseSet(this::initializeResource);
 }
 ```
 
