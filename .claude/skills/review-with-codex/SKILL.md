@@ -108,15 +108,21 @@ cmux set-progress 0.3 --label "Codex reviewing plan..."
 cmux set-progress 0.7 --label "Review received, analyzing..."
 ```
 
-### 7. 리뷰 결과 수집
+### 7. 리뷰 결과를 현재 pane으로 가져오기
+
+**데이터 전달 메커니즘**: Pane A(현재 Claude Code)와 Pane B(Codex)는
+같은 파일시스템(`/tmp/`)을 공유한다. Codex가 파일에 쓰면, 현재 pane에서 읽을 수 있다.
 
 ```bash
 cat /tmp/codex-plan-review.md
 ```
 
+이 Bash 도구 실행 결과가 **현재 Claude Code 세션의 컨텍스트에 직접 주입**된다.
+즉, Claude가 리뷰 전문을 읽고 이해한 상태에서 다음 단계를 수행한다.
+
 ### 8. 플랜 재작성 (핵심)
 
-Codex 리뷰를 바탕으로 **현재 플랜을 다시 생각한다**:
+**현재 pane(원래 플랜을 작성하던 Claude Code 세션)에서** 리뷰를 바탕으로 플랜을 다시 생각한다:
 
 - 리뷰에서 지적한 **누락된 내용** 추가
 - **아키텍처 우려사항** 반영하여 설계 수정
