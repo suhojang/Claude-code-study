@@ -1,3 +1,8 @@
+---
+description: 공유 커널(_shared) 모듈 규칙. 공통 인프라 코드 작성 시 적용.
+globs: src/main/java/**/_shared/**/*.java, src/test/java/**/_shared/**/*.java
+---
+
 # 공유 커널 (_shared Module)
 
 **소유팀**: team-platform

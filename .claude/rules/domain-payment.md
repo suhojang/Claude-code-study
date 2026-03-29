@@ -1,3 +1,8 @@
+---
+description: 결제 모듈 규칙. 결제 도메인 코드 작성 시 적용.
+globs: src/main/java/**/payment/**/*.java, src/test/java/**/payment/**/*.java
+---
+
 # 결제 모듈 (Payment Module)
 
 **소유팀**: team-payment

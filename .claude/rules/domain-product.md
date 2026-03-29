@@ -1,3 +1,8 @@
+---
+description: 상품 모듈 규칙. 상품 도메인 코드 작성 시 적용.
+globs: src/main/java/**/product/**/*.java, src/test/java/**/product/**/*.java
+---
+
 # 상품 모듈 (Product Module)
 
 **소유팀**: team-product
@@ -76,16 +81,14 @@ public interface FindProductQuery {
 }
 ```
 
-## 발행 이벤트
+## 발행/수신 이벤트
 
-| 이벤트 | 발행 시점 | 소비 모듈 |
+| 발행 이벤트 | 시점 | 소비 모듈 |
 |:---|:---|:---|
 | `ProductStockDecreasedEvent` | 재고 차감 완료 | notification (품절 임박 알림) |
 | `ProductStockRestoredEvent` | 재고 복구 (주문 취소) | notification (재입고 알림) |
 
-## 수신 이벤트
-
-| 이벤트 | 발행 모듈 | 처리 내용 |
+| 수신 이벤트 | 발행 모듈 | 처리 내용 |
 |:---|:---|:---|
 | `OrderCreatedEvent` | order | 주문 항목만큼 재고 차감 |
 | `OrderCancelledEvent` | order | 차감한 재고 복구 |

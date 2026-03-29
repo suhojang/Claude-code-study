@@ -133,17 +133,16 @@ src/main/java/com/example/app/
 
 ## 도메인 모듈별 상세 규칙
 
-각 모듈 디렉토리에 CLAUDE.md가 있으며, 해당 모듈 작업 시 자동으로 로드된다.
+`.claude/rules/domain-*.md`에 각 모듈의 상세 규칙이 정의되어 있다.
+**globs 패턴으로 해당 모듈 파일 작업 시 자동으로 로드된다.**
 
-- 주문: `src/main/java/com/example/app/order/CLAUDE.md`
-- 상품: `src/main/java/com/example/app/product/CLAUDE.md`
-- 회원: `src/main/java/com/example/app/member/CLAUDE.md`
-- 결제: `src/main/java/com/example/app/payment/CLAUDE.md`
-- 배송: `src/main/java/com/example/app/delivery/CLAUDE.md`
-- 알림: `src/main/java/com/example/app/notification/CLAUDE.md`
-- 공유: `src/main/java/com/example/app/_shared/CLAUDE.md`
-
-## DB 마이그레이션
+- 주문: `.claude/rules/domain-order.md` → `**/order/**/*.java`
+- 상품: `.claude/rules/domain-product.md` → `**/product/**/*.java`
+- 회원: `.claude/rules/domain-member.md` → `**/member/**/*.java`
+- 결제: `.claude/rules/domain-payment.md` → `**/payment/**/*.java`
+- 배송: `.claude/rules/domain-delivery.md` → `**/delivery/**/*.java`
+- 알림: `.claude/rules/domain-notification.md` → `**/notification/**/*.java`
+- 공유: `.claude/rules/domain-shared.md` → `**/_shared/**/*.java`
 
 - Flyway 경로: **모듈별 분리** `src/main/resources/db/migration/{module}/`
   - `db/migration/order/V2026032901__create_order_tables.sql`

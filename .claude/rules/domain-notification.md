@@ -1,3 +1,8 @@
+---
+description: 알림 모듈 규칙. 알림 도메인 코드 작성 시 적용.
+globs: src/main/java/**/notification/**/*.java, src/test/java/**/notification/**/*.java
+---
+
 # 알림 모듈 (Notification Module)
 
 **소유팀**: team-platform

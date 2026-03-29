@@ -1,3 +1,8 @@
+---
+description: 주문 모듈 규칙. 주문 도메인 코드 작성 시 적용.
+globs: src/main/java/**/order/**/*.java, src/test/java/**/order/**/*.java
+---
+
 # 주문 모듈 (Order Module)
 
 **소유팀**: team-order

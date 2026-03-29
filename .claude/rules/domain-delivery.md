@@ -1,3 +1,8 @@
+---
+description: 배송 모듈 규칙. 배송 도메인 코드 작성 시 적용.
+globs: src/main/java/**/delivery/**/*.java, src/test/java/**/delivery/**/*.java
+---
+
 # 배송 모듈 (Delivery Module)
 
 **소유팀**: team-delivery
