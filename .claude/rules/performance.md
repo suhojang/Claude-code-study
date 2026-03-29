@@ -68,14 +68,11 @@ class ProductPersistenceAdapter implements LoadProductPort {
 
     @Override
     public Optional<Product> findById(ProductId id) {
-        // 1. Redis 캐시 조회
         String key = "product:" + id.value();
         ProductCacheDto cached = redisTemplate.opsForValue().get(key);
         if (cached != null) {
             return Optional.of(cached.toDomain());
         }
-
-        // 2. DB 조회 + 캐시 저장
         return productJpaRepository.findById(id.value())
             .map(entity -> {
                 Product product = mapper.toDomain(entity);
@@ -108,20 +105,13 @@ spring:
 
 ```java
 // ❌ synchronized → Virtual Thread pinning 발생
-synchronized (this) {
-    // ...
-}
+synchronized (this) { }
 
 // ✅ ReentrantLock 사용
 private final ReentrantLock lock = new ReentrantLock();
-
 public void doSomething() {
     lock.lock();
-    try {
-        // ...
-    } finally {
-        lock.unlock();
-    }
+    try { /* ... */ } finally { lock.unlock(); }
 }
 ```
 
@@ -134,7 +124,7 @@ private static final ThreadLocal<MemberId> currentMember = new ThreadLocal<>();
 private static final ScopedValue<MemberId> CURRENT_MEMBER = ScopedValue.newInstance();
 
 ScopedValue.runWhere(CURRENT_MEMBER, memberId, () -> {
-    orderService.execute(command);  // 하위 호출에서 CURRENT_MEMBER.get() 가능
+    orderService.execute(command);
 });
 ```
 
@@ -146,13 +136,9 @@ public OrderSummary buildOrderSummary(OrderId orderId) throws Exception {
         var orderTask = scope.fork(() -> loadOrderPort.findById(orderId));
         var paymentTask = scope.fork(() -> loadPaymentPort.findByOrderId(orderId));
         var deliveryTask = scope.fork(() -> trackDeliveryPort.track(orderId));
-
         scope.join();
-
         return new OrderSummary(
-            orderTask.get(),
-            paymentTask.get(),
-            deliveryTask.get()
+            orderTask.get(), paymentTask.get(), deliveryTask.get()
         );
     }
 }
@@ -160,9 +146,6 @@ public OrderSummary buildOrderSummary(OrderId orderId) throws Exception {
 
 ### StableValue (지연 초기화)
 ```java
-// ❌ volatile + double-checked locking: 복잡하고 실수 가능
-private volatile ExpensiveResource resource;
-
 // ✅ StableValue: 스레드 안전한 지연 초기화 (Java 25)
 private final StableValue<ExpensiveResource> resource = StableValue.of();
 
@@ -171,33 +154,40 @@ public ExpensiveResource getResource() {
 }
 ```
 
-## 비동기 이벤트 처리
+## Spring Modulith 이벤트 성능
 
+### @ApplicationModuleListener 비동기 처리
 ```java
-// 즉시 응답이 필요 없는 후처리: @Async + @TransactionalEventListener
-@Async
-@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-public void handleOrderCreated(OrderCreatedEvent event) {
-    // 알림 발송, 통계 갱신 등 비동기 처리
+// Spring Modulith의 @ApplicationModuleListener는 기본적으로
+// @Async + @TransactionalEventListener(AFTER_COMMIT) 조합
+// Virtual Thread가 활성화되면 자동으로 Virtual Thread에서 실행
+
+@ApplicationModuleListener
+void on(OrderCreatedEvent event) {
+    // 비동기로 실행 — 발행자의 응답 속도에 영향 없음
     notificationService.sendOrderConfirmation(event.orderId());
 }
 ```
 
-### 비동기 규칙
-- 트랜잭션 커밋 후 실행: `TransactionPhase.AFTER_COMMIT`
-- 실패 시 재시도: `@Retryable` (Spring Retry) 적용
-- Dead Letter Queue: 재시도 초과 시 실패 이벤트 별도 저장
+### 이벤트 재시도 (Event Publication Registry)
+```yaml
+spring:
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: true
+    republish-outstanding-events-on-restart: true
+```
 
 ## 외부 API 호출 (Resilience)
 
 ```java
-// Circuit Breaker + Timeout + Retry
 @Repository
 @RequiredArgsConstructor
 class PaymentGatewayAdapter implements RequestPaymentPort {
 
     private final RestClient restClient;
-    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     @CircuitBreaker(name = "paymentGateway", fallbackMethod = "fallback")
@@ -227,15 +217,11 @@ class PaymentGatewayAdapter implements RequestPaymentPort {
 ## 로깅
 
 ```java
-// ✅ 구조화된 로그 (운영 환경에서 검색 가능)
+// ✅ 구조화된 로그
 log.info("주문 생성 완료 [orderId={}, memberId={}, amount={}]",
     orderId, memberId, totalAmount);
 
-// ❌ 금지: 민감 정보 로깅
-log.info("결제 요청 [cardNumber={}, cvv={}]", cardNumber, cvv);
-
-// ❌ 금지: 문자열 연결
-log.info("주문 생성 완료: " + orderId);  // 로그 레벨 무시해도 문자열 생성
+// ❌ 금지: 민감 정보 로깅, 문자열 연결
 ```
 
 ### 로깅 규칙

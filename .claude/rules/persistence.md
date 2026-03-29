@@ -1,9 +1,44 @@
 ---
-description: 영속성 계층(Persistence Adapter) 규칙. JPA Entity, Repository, Mapper 작성 시 적용.
+description: 영속성 계층(Persistence Adapter) 규칙. JPA Entity, Repository, Mapper 작성 시 적용. 각 모듈은 자기 소유 테이블만 접근.
 globs: src/main/java/**/adapter/out/persistence/**/*.java
 ---
 
 # 영속성 계층 규칙
+
+## 모듈별 테이블 소유권 (Spring Modulith 환경)
+
+각 모듈은 자기 접두어의 테이블만 소유하고 접근한다.
+**다른 모듈의 테이블에 직접 JOIN하거나 FK를 걸지 않는다.**
+
+| 모듈 | 접두어 | 예시 테이블 |
+|:---|:---|:---|
+| order | `ord_` | `ord_order`, `ord_order_item` |
+| product | `prd_` | `prd_product`, `prd_category` |
+| member | `mbr_` | `mbr_member`, `mbr_address` |
+| payment | `pay_` | `pay_payment`, `pay_refund` |
+| delivery | `dlv_` | `dlv_delivery`, `dlv_tracking` |
+| notification | `ntf_` | `ntf_notification` |
+
+```java
+// ✅ 같은 모듈 테이블 간 JOIN
+@Query("SELECT o FROM OrderJpaEntity o JOIN FETCH o.items WHERE o.id = :id")
+Optional<OrderJpaEntity> findByIdWithItems(@Param("id") Long id);
+
+// ❌ 금지: 다른 모듈 테이블 직접 JOIN
+@Query("SELECT o FROM OrderJpaEntity o JOIN ProductJpaEntity p ON ...")  // ❌
+```
+
+다른 모듈의 데이터가 필요하면 공개 API(`api/` 인터페이스)를 통해 조회하거나 이벤트로 데이터를 동기화한다.
+
+### 모듈별 Flyway 마이그레이션 분리
+
+```
+src/main/resources/db/migration/
+├── order/V2026032901__create_order_tables.sql        ← team-order만 수정
+├── product/V2026032901__create_product_tables.sql    ← team-product만 수정
+├── member/V2026032901__create_member_tables.sql      ← team-member만 수정
+└── payment/V2026032901__create_payment_tables.sql    ← team-payment만 수정
+```
 
 ## Domain Model ↔ JPA Entity 완전 분리
 

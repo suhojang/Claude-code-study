@@ -1,5 +1,5 @@
 ---
-description: REST API 설계 및 Web Adapter 규칙. Controller와 DTO 작성 시 적용.
+description: REST API 설계 및 Web Adapter 규칙. Controller와 DTO 작성 시 적용. 각 모듈의 Controller는 해당 모듈 내부에서만 정의.
 globs: src/main/java/**/adapter/in/web/**/*.java
 ---
 

@@ -1,35 +1,85 @@
 ---
-description: Spring Security 및 보안 규칙. 인증/인가 및 보안 관련 코드 작성 시 적용.
-globs: src/main/java/**/global/auth/**/*.java, src/main/java/**/global/config/Security*.java, src/main/java/**/adapter/in/web/**/*.java
+description: Spring Security 및 보안 규칙. 인증/인가 및 보안 관련 코드 작성 시 적용. 각 모듈은 SecurityCustomizer로 자기 URL 보안 규칙 기여.
+globs: src/main/java/**/_shared/auth/**/*.java, src/main/java/**/_shared/config/Security*.java, src/main/java/**/adapter/in/web/**/*.java
 ---
 
 # 보안 규칙
 
-## Spring Security 7.x 설정
+## Spring Security 7.x 설정 (모듈별 분산 구성)
+
+각 모듈이 자기 URL의 보안 규칙을 `SecurityCustomizer` Bean으로 기여하여,
+**SecurityConfig 파일의 충돌을 방지**한다.
+
+### _shared의 중앙 SecurityConfig (platform 팀 소유)
 
 ```java
+// _shared/config/SecurityConfig.java — platform 팀만 수정
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final List<SecurityCustomizer> moduleCustomizers;  // 각 모듈이 기여
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        return http
+        http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(session ->
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll()
-                .requestMatchers("/api/v1/products/**").permitAll()
-                .requestMatchers("/actuator/health").permitAll()
-                .anyRequest().authenticated()
-            )
             .addFilterBefore(jwtAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class)
-            .build();
+                UsernamePasswordAuthenticationFilter.class);
+
+        // 공통 규칙
+        http.authorizeHttpRequests(auth -> auth
+            .requestMatchers("/actuator/health").permitAll()
+            .requestMatchers("/api/v1/auth/**").permitAll()
+        );
+
+        // 각 모듈이 기여한 보안 규칙 적용
+        for (SecurityCustomizer customizer : moduleCustomizers) {
+            customizer.customize(http);
+        }
+
+        // 나머지는 인증 필수
+        http.authorizeHttpRequests(auth -> auth.anyRequest().authenticated());
+
+        return http.build();
+    }
+}
+```
+
+### 모듈별 SecurityCustomizer (각 팀 소유)
+
+```java
+// _shared/config/SecurityCustomizer.java — 인터페이스
+@FunctionalInterface
+public interface SecurityCustomizer {
+    void customize(HttpSecurity http) throws Exception;
+}
+
+// order/OrderModuleConfig.java — team-order 소유
+@Configuration
+class OrderModuleConfig {
+    @Bean
+    SecurityCustomizer orderSecurity() {
+        return http -> http.authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.GET, "/api/v1/orders/**").hasRole("USER")
+            .requestMatchers(HttpMethod.POST, "/api/v1/orders/**").hasRole("USER")
+        );
+    }
+}
+
+// product/ProductModuleConfig.java — team-product 소유
+@Configuration
+class ProductModuleConfig {
+    @Bean
+    SecurityCustomizer productSecurity() {
+        return http -> http.authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/products/**").hasRole("SELLER")
+        );
     }
 }
 ```

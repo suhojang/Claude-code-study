@@ -1,5 +1,5 @@
 ---
-description: 테스트 코드 작성 규칙. 모든 테스트 파일에 적용.
+description: 테스트 코드 작성 규칙. Spring Modulith 모듈 테스트 포함. 모든 테스트 파일에 적용.
 globs: src/test/**/*.java
 ---
 
@@ -13,8 +13,91 @@ globs: src/test/**/*.java
 | domain.model | 순수 단위 테스트 | 없음 | ❌ 금지 |
 | adapter.in.web | 슬라이스 테스트 | `@WebMvcTest` | 최소 로드 |
 | adapter.out.persistence | 슬라이스 테스트 | `@DataJpaTest` + Testcontainers | 최소 로드 |
-| 모듈 간 통합 | 통합 테스트 | `@SpringBootTest` + Testcontainers | 전체 로드 |
+| 모듈 내부 통합 | 모듈 격리 테스트 | `@ApplicationModuleTest` | 모듈만 로드 |
+| 모듈 간 이벤트 | 이벤트 발행/수신 테스트 | `@ApplicationModuleTest` + `Scenario` | 모듈만 로드 |
+| 전체 통합 | 통합 테스트 | `@SpringBootTest` + Testcontainers | 전체 로드 |
+| 모듈 구조 검증 | Modulith 구조 테스트 | `ApplicationModules.of()` | ❌ |
 | 아키텍처 검증 | ArchUnit | `@AnalyzeClasses` | ❌ |
+
+## Spring Modulith 모듈 구조 검증 테스트
+
+모든 모듈 경계 규칙을 자동으로 검증하는 필수 테스트.
+**이 테스트가 실패하면 빌드가 중단된다.**
+
+```java
+class ModularityTests {
+
+    @Test
+    void should_verify_modulith_structure() {
+        // 모듈 간 내부 패키지 접근 위반, 순환 참조 등 자동 감지
+        ApplicationModules.of(Application.class).verify();
+    }
+
+    @Test
+    void should_generate_module_documentation() {
+        var modules = ApplicationModules.of(Application.class);
+        new Documenter(modules)
+            .writeModulesAsPlantUml()
+            .writeIndividualModulesAsPlantUml();
+    }
+}
+```
+
+## Spring Modulith 모듈 격리 테스트 (`@ApplicationModuleTest`)
+
+각 모듈을 독립적으로 테스트하여 **다른 모듈 변경에 영향받지 않음**을 보장한다.
+팀 간 협업 시 자기 모듈의 테스트만 실행해도 안전성을 확인할 수 있다.
+
+```java
+// order 모듈만 격리하여 테스트 (다른 모듈 Bean은 로드하지 않음)
+@ApplicationModuleTest
+class OrderModuleIntegrationTest {
+
+    @Autowired
+    private CreateOrderUseCase createOrderUseCase;
+
+    @MockitoBean
+    private FindProductQuery findProductQuery;  // 다른 모듈의 공개 API는 Mock
+
+    @DisplayName("주문 모듈 내부에서 주문 생성이 정상 동작한다")
+    @Test
+    void should_create_order_within_module() {
+        // Given
+        given(findProductQuery.findById(anyLong()))
+            .willReturn(new ProductInfo(1L, "상품", 10000L, 100));
+
+        // When
+        OrderId result = createOrderUseCase.execute(OrderFixture.createCommand());
+
+        // Then
+        assertThat(result).isNotNull();
+    }
+}
+```
+
+## Spring Modulith 이벤트 시나리오 테스트 (`Scenario`)
+
+모듈 간 이벤트 발행/수신 흐름을 검증한다.
+
+```java
+@ApplicationModuleTest
+@RequiredArgsConstructor
+class OrderEventPublicationTest {
+
+    private final CreateOrderUseCase createOrderUseCase;
+
+    @DisplayName("주문 생성 시 OrderCreatedEvent가 발행된다")
+    @Test
+    void should_publish_order_created_event(Scenario scenario) {
+        scenario.stimulate(() -> createOrderUseCase.execute(OrderFixture.createCommand()))
+            .andWaitForEventOfType(OrderCreatedEvent.class)
+            .matching(event -> event.orderId() != null)
+            .toArriveAndVerify(event -> {
+                assertThat(event.totalAmount()).isPositive();
+            });
+    }
+}
+```
 
 ## 테스트 메서드 네이밍
 
@@ -29,18 +112,11 @@ void should_create_order_when_stock_is_sufficient() {
     // When
     // Then
 }
-
-@DisplayName("이미 취소된 주문을 다시 취소하면 예외가 발생한다")
-@Test
-void should_throw_exception_when_cancel_already_cancelled_order() {
-    // Given
-    // When & Then
-}
 ```
 
 ## Given-When-Then 패턴
 
-모든 테스트에 주석으로 구분. 각 섹션의 역할을 명확히 한다.
+모든 테스트에 주석으로 구분.
 
 ```java
 @Test
@@ -66,7 +142,6 @@ void should_create_order_when_stock_is_sufficient() {
 // ✅ Spring Context 없이 순수 단위 테스트
 class CreateOrderServiceTest {
 
-    // Mock은 Mockito로 직접 생성
     private final LoadProductPort loadProductPort = mock(LoadProductPort.class);
     private final SaveOrderPort saveOrderPort = mock(SaveOrderPort.class);
     private final OrderEventPort orderEventPort = mock(OrderEventPort.class);
@@ -87,10 +162,7 @@ class CreateOrderServiceTest {
 
 ```java
 // ❌ 금지: domain 테스트에 Spring Context 로드
-@SpringBootTest  // ❌ domain 테스트에 사용 금지
-class CreateOrderServiceTest { }
-
-@ExtendWith(SpringExtension.class)  // ❌ 불필요한 Spring 확장
+@SpringBootTest  // ❌
 class CreateOrderServiceTest { }
 ```
 
@@ -104,7 +176,7 @@ class OrderControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
-    private CreateOrderUseCase createOrderUseCase;  // Port 인터페이스를 Mock
+    private CreateOrderUseCase createOrderUseCase;
 
     @DisplayName("POST /api/v1/orders - 유효한 요청이면 201 Created를 반환한다")
     @Test
@@ -193,7 +265,6 @@ public class OrderFixture {
 
     public static Order withStatus(OrderStatus status) {
         Order order = create();
-        // 리플렉션 또는 테스트용 메서드로 상태 변경
         ReflectionTestUtils.setField(order, "status", status);
         return order;
     }
@@ -210,10 +281,12 @@ public class OrderFixture {
 
 ## 테스트 원칙
 
-- 하나의 테스트에 하나의 검증 (단일 assert 또는 밀접하게 관련된 assert 그룹)
-- 테스트 간 순서 의존성 금지 (독립 실행 가능해야 함)
-- 테스트 데이터는 테스트 내부에서 생성 (외부 파일/DB 의존 최소화)
+- 하나의 테스트에 하나의 검증
+- 테스트 간 순서 의존성 금지
+- 테스트 데이터는 테스트 내부에서 생성
 - `@Nested` 클래스로 테스트를 논리적으로 그룹핑
+- **모듈 테스트 독립성**: 자기 모듈 테스트는 다른 모듈 변경에 영향받지 않아야 함
+- **다른 모듈 의존은 반드시 Mock**: `@ApplicationModuleTest`에서 외부 모듈 공개 API는 `@MockitoBean`
 
 ```java
 class OrderTest {
